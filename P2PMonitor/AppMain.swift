@@ -16,7 +16,7 @@ struct P2PMonitorApp: App {
         }
         .defaultSize(width: 760, height: 600)
         // Qualified: SwiftUI.Settings collides with P2PKit.Settings.
-        SwiftUI.Settings { Text("Preferences").padding() }
+        SwiftUI.Settings { SettingsView() }
     }
 }
 
