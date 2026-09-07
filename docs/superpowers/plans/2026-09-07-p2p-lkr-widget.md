@@ -33,6 +33,12 @@
   properties (or `@Observable`) are correct for `CollectorService`.
 - **Annotate `AppDelegate` `@MainActor`.** It touches the `@MainActor`
   `AppEnvironment`, which strict concurrency otherwise rejects.
+- **AppIntents cannot use enums from another module.** The metadata extractor
+  fails with "enums implemented in an imported framework or library are not
+  supported", and it also requires `typeDisplayRepresentation` and
+  `caseDisplayRepresentations` be compile-time constants (`static let`), not
+  computed properties. The widget therefore declares local `SideOption` /
+  `WindowOption` mirrors and maps to P2PKit types. Confirmed in Task 13.
 - **No emoji in UI copy.** Use SF Symbols for iconography.
 - **Tests never touch the network.** `URLProtocol` stubs serve the recorded fixtures.
 - **Swift Testing runs tests in parallel by default.** Any suite touching
@@ -3007,14 +3013,18 @@ struct RateConfigurationIntent: WidgetConfigurationIntent {
 }
 ```
 
-> **If the retroactive conformances fight you:** `AppEnum` conformance declared
-> outside the module that owns the type is the one genuinely uncertain
-> construct in this plan. Should the compiler reject it, do **not** move `Side`
-> or `ChartWindow` into the widget target. Instead declare widget-local mirrors
-> and map at the boundary — `enum SideOption: String, AppEnum { case sell, buy }`
-> with `var asSide: Side`, and likewise for the window. The intent then exposes
-> the mirrors and `RateTimelineProvider` converts them, leaving `P2PKit` free of
-> any AppIntents dependency.
+> **Confirmed during execution: the retroactive-conformance version above
+> does NOT compile.** `appintentsmetadataprocessor` rejects it with "enums
+> implemented in an imported framework or library are not supported", and
+> separately requires the display representations be `static let` constants
+> rather than computed properties. Use local mirrors instead — declare
+> `enum SideOption: String, AppEnum { case sell, buy }` and
+> `enum WindowOption: String, AppEnum { case hour1, hour24, day7, day30 }`
+> in the widget target with `var asSide: Side` / `var asWindow: ChartWindow`
+> accessors, expose those from the intent, and convert in
+> `RateTimelineProvider.entry(for:now:)`. This keeps P2PKit free of any
+> AppIntents dependency. See `P2PWidget/RateConfigurationIntent.swift` for
+> the shipped version.
 
 - [ ] **Step 3: Implement the timeline provider**
 
