@@ -117,4 +117,58 @@ public final class Store {
             return statement.string(0) ?? ""
         }
     }
+
+    /// Fillable prices inside `window`, oldest first, bucket-averaged per the
+    /// window's `bucketSeconds`.
+    ///
+    /// Rows whose `fillable_price` is NULL are excluded: nothing was tradeable
+    /// then, and substituting a zero or carrying the previous value forward
+    /// would draw a line that never existed.
+    public func series(side: Side, amountUSDT: Int,
+                       window: ChartWindow, now: Date = .now) throws -> [SeriesPoint] {
+        let cutoff = Int(now.addingTimeInterval(-window.duration).timeIntervalSince1970)
+        let raw: [SeriesPoint] = try database.statement("""
+        SELECT ts, fillable_price FROM samples
+        WHERE side = ?1 AND amount_usdt = ?2 AND ts >= ?3 AND fillable_price IS NOT NULL
+        ORDER BY ts ASC;
+        """) { statement in
+            statement.bind(1, side.rawValue)
+            statement.bind(2, amountUSDT)
+            statement.bind(3, cutoff)
+            var points: [SeriesPoint] = []
+            while try statement.step() {
+                points.append(SeriesPoint(
+                    timestamp: Date(timeIntervalSince1970: TimeInterval(statement.int(0))),
+                    price: statement.double(1)))
+            }
+            return points
+        }
+        return MetricsEngine.downsample(raw, bucketSeconds: window.bucketSeconds)
+    }
+
+    public func replaceSnapshot(side: Side, ads: [Ad], capturedAt: Date) throws {
+        let payload = try JSONEncoder().encode(ads)
+        let text = String(decoding: payload, as: UTF8.self)
+        try database.statement("""
+        INSERT OR REPLACE INTO snapshot (side, captured_at, payload) VALUES (?1, ?2, ?3);
+        """) { statement in
+            statement.bind(1, side.rawValue)
+            statement.bind(2, Int(capturedAt.timeIntervalSince1970))
+            statement.bind(3, text)
+            _ = try statement.step()
+        }
+    }
+
+    public func snapshot(side: Side) throws -> (capturedAt: Date, ads: [Ad])? {
+        try database.statement("""
+        SELECT captured_at, payload FROM snapshot WHERE side = ?1;
+        """) { statement in
+            statement.bind(1, side.rawValue)
+            guard try statement.step() else { return nil }
+            let capturedAt = Date(timeIntervalSince1970: TimeInterval(statement.int(0)))
+            guard let text = statement.string(1) else { return nil }
+            let ads = try JSONDecoder().decode([Ad].self, from: Data(text.utf8))
+            return (capturedAt, ads)
+        }
+    }
 }
