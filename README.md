@@ -76,6 +76,17 @@ At 16px a hairline stroke and the watermark both turn to mud, so the renderer
 has three tiers — full detail at 64px and up, watermark dropped and stroke
 thickened below that, and a simplified four-point line at 16px.
 
+**The artwork is full bleed on purpose.** macOS 26 composites a legacy `.icns`
+onto its own rounded container, so drawing our own squircle with a transparent
+margin nested our shape inside Apple's and produced a small icon floating in a
+dark plate. The renderer fills the canvas and lets the system apply the shape
+and shadow; content stays inside an 80% safe area because the system rounds the
+corners. To check what macOS actually resolves rather than what we wrote:
+
+```sh
+swift tools/resolve-icon.swift /Applications/P2PMonitor.app /tmp/icon.png
+```
+
 ## Layout
 
 | Path | Contents |
