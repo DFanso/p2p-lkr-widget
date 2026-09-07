@@ -171,4 +171,58 @@ public final class Store {
             return (capturedAt, ads)
         }
     }
+
+    public func upsertAlert(_ rule: AlertRule, state: AlertState, firedAt: Date?) throws {
+        try database.statement("""
+        INSERT OR REPLACE INTO alerts
+          (id, side, amount_usdt, threshold, direction, last_state, last_fired_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);
+        """) { statement in
+            statement.bind(1, rule.id)
+            statement.bind(2, rule.side.rawValue)
+            statement.bind(3, rule.amountUSDT)
+            statement.bind(4, rule.threshold)
+            statement.bind(5, rule.direction.rawValue)
+            statement.bind(6, state.rawValue)
+            if let firedAt {
+                statement.bind(7, Int(firedAt.timeIntervalSince1970))
+            } else {
+                statement.bind(7, nil as Double?)
+            }
+            _ = try statement.step()
+        }
+    }
+
+    public func alertRules() throws -> [AlertRule] {
+        try database.statement("""
+        SELECT id, side, amount_usdt, threshold, direction FROM alerts ORDER BY id;
+        """) { statement in
+            var rules: [AlertRule] = []
+            while try statement.step() {
+                guard let id = statement.string(0),
+                      let side = statement.string(1).flatMap({ Side(rawValue: $0) }),
+                      let direction = statement.string(4)
+                          .flatMap({ ThresholdDirection(rawValue: $0) })
+                else { continue }
+                rules.append(AlertRule(id: id, side: side, amountUSDT: statement.int(2),
+                                       threshold: statement.double(3), direction: direction))
+            }
+            return rules
+        }
+    }
+
+    public func alertState(id: String) throws -> AlertState? {
+        try database.statement("SELECT last_state FROM alerts WHERE id = ?1;") { statement in
+            statement.bind(1, id)
+            guard try statement.step() else { return nil }
+            return statement.string(0).flatMap { AlertState(rawValue: $0) }
+        }
+    }
+
+    public func deleteAlert(id: String) throws {
+        try database.statement("DELETE FROM alerts WHERE id = ?1;") { statement in
+            statement.bind(1, id)
+            _ = try statement.step()
+        }
+    }
 }
