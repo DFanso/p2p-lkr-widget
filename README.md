@@ -54,6 +54,21 @@ sqlite3 "$HOME/Library/Group Containers/UN798LFFKG.group.dev.dfanso.p2pmonitor/p
 read 330.70 against a top of book of 332.00 — a 1.30 LKR gap per unit that a
 naive reading of the page would have got wrong.
 
+## App icon
+
+The icon is generated, not hand-drawn — `make icon` runs
+`tools/make-icon.swift`, which renders all ten asset-catalog slots (seven
+unique sizes) with Core Graphics. The PNGs are committed so a fresh clone
+builds without running it.
+
+A rising sparkline over an emerald ground, with the Sri Lankan rupee glyph
+watermarked behind. It carries no Binance or Tether marks: those are
+trademarks, and using them would misrepresent this as an official client.
+
+At 16px a hairline stroke and the watermark both turn to mud, so the renderer
+has three tiers — full detail at 64px and up, watermark dropped and stroke
+thickened below that, and a simplified four-point line at 16px.
+
 ## Layout
 
 | Path | Contents |
