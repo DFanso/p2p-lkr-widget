@@ -49,4 +49,8 @@ Queries the endpoint directly, no build required:
 
 ## Requirements
 
-macOS 26+, Xcode 26+, and a signing identity with an App Group entitlement.
+macOS 14+ (developed on 26.6), Xcode 26+, `xcodegen` (`brew install xcodegen`),
+and a signing identity whose team can carry an App Group entitlement.
+
+The Xcode project is generated, not committed. Run `make project` after cloning,
+and again after adding or renaming any source file.
