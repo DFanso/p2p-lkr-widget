@@ -25,6 +25,14 @@
   non-Sendable class across an actor boundary. The conformance is sound only
   because the handle is opened `SQLITE_OPEN_FULLMUTEX` (serialized mode);
   drop that flag and the conformance becomes a lie. Hit during Task 10.
+- **`SwiftUI.Settings` collides with `P2PKit.Settings`.** Any file importing
+  both must qualify the scene as `SwiftUI.Settings { ... }`, or the name is
+  ambiguous. Hit during Task 11.
+- **Do not use `@Published` outside an `ObservableObject`.** It needs Combine
+  and an `ObservableObject` conformance to mean anything; plain stored
+  properties (or `@Observable`) are correct for `CollectorService`.
+- **Annotate `AppDelegate` `@MainActor`.** It touches the `@MainActor`
+  `AppEnvironment`, which strict concurrency otherwise rejects.
 - **No emoji in UI copy.** Use SF Symbols for iconography.
 - **Tests never touch the network.** `URLProtocol` stubs serve the recorded fixtures.
 - **Swift Testing runs tests in parallel by default.** Any suite touching
