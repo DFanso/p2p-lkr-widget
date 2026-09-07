@@ -115,7 +115,17 @@ cp fixtures/lkr-sell-20260907.json fixtures/lkr-buy-20260907.json \
    P2PKit/Tests/P2PKitTests/Fixtures/
 ```
 
-- [ ] **Step 3: Write the failing test for AppGroup**
+- [ ] **Step 3: Create an empty source file so SPM can configure the target**
+
+SwiftPM refuses to resolve a package whose target directory has no sources
+(`target 'P2PKit' referenced in product 'P2PKit' is empty`), which would mask
+the intended test failure with a package error.
+
+```bash
+printf 'import Foundation\n' > P2PKit/Sources/P2PKit/AppGroup.swift
+```
+
+- [ ] **Step 4: Write the failing test for AppGroup**
 
 `P2PKit/Tests/P2PKitTests/AppGroupTests.swift`:
 
@@ -142,12 +152,12 @@ import Foundation
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it fails**
+- [ ] **Step 5: Run the test to verify it fails**
 
 Run: `cd P2PKit && swift test --filter AppGroup`
 Expected: FAIL — `cannot find 'AppGroup' in scope`.
 
-- [ ] **Step 5: Implement AppGroup**
+- [ ] **Step 6: Implement AppGroup**
 
 `P2PKit/Sources/P2PKit/AppGroup.swift`:
 
@@ -171,12 +181,12 @@ public enum AppGroup {
 }
 ```
 
-- [ ] **Step 6: Run the test to verify it passes**
+- [ ] **Step 7: Run the test to verify it passes**
 
 Run: `cd P2PKit && swift test --filter AppGroup`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 7: Write the entitlements files**
+- [ ] **Step 8: Write the entitlements files**
 
 `P2PMonitor/P2PMonitor.entitlements`:
 
@@ -205,7 +215,7 @@ would invite exactly the design mistake this architecture avoids.
 </dict></plist>
 ```
 
-- [ ] **Step 8: Write project.yml**
+- [ ] **Step 9: Write project.yml**
 
 ```yaml
 name: P2PMonitor
@@ -257,7 +267,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: P2PWidget/P2PWidget.entitlements
 ```
 
-- [ ] **Step 9: Write the two entry points**
+- [ ] **Step 10: Write the two entry points**
 
 `P2PMonitor/AppMain.swift` — **note the filename**, see Global Constraints:
 
@@ -306,7 +316,7 @@ struct P2PWidgetBundle: WidgetBundle {
 }
 ```
 
-- [ ] **Step 10: Write the Makefile**
+- [ ] **Step 11: Write the Makefile**
 
 ```makefile
 .PHONY: project build test sign-check clean
@@ -336,23 +346,23 @@ clean:
 	rm -rf P2PMonitor.xcodeproj P2PKit/.build
 ```
 
-- [ ] **Step 11: Add generated artifacts to .gitignore**
+- [ ] **Step 12: Add generated artifacts to .gitignore**
 
 ```bash
 printf '\n# XcodeGen output (regenerate with `make project`)\nP2PMonitor.xcodeproj/\n' >> .gitignore
 ```
 
-- [ ] **Step 12: Verify the unsigned build succeeds**
+- [ ] **Step 13: Verify the unsigned build succeeds**
 
 Run: `make build`
 Expected: `** BUILD SUCCEEDED **`
 
-- [ ] **Step 13: Verify signing and App Group propagation**
+- [ ] **Step 14: Verify signing and App Group propagation**
 
 Run: `make sign-check`
 Expected: `** BUILD SUCCEEDED **`, `P2PWidget.appex` listed under `Contents/PlugIns/`, and `UN798LFFKG.group.dev.dfanso.p2pmonitor` printed **twice** — once for the app, once for the widget. If it appears only once the widget cannot read the database.
 
-- [ ] **Step 14: Commit**
+- [ ] **Step 15: Commit**
 
 ```bash
 git add -A
