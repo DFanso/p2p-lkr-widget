@@ -8,7 +8,7 @@ public enum StoreError: Error, Equatable {
 }
 
 /// Minimal wrapper over the system SQLite so the package stays dependency-free.
-final class Database {
+final class Database: @unchecked Sendable {
     private var handle: OpaquePointer?
 
     init(fileURL: URL) throws {

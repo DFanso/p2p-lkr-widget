@@ -2,7 +2,12 @@ import Foundation
 
 /// Shared SQLite store. The collector app writes; the widget extension reads.
 /// WAL mode lets those overlap across processes without the reader blocking.
-public final class Store {
+///
+/// `@unchecked Sendable` is sound here specifically because the handle is
+/// opened with `SQLITE_OPEN_FULLMUTEX`, SQLite's serialized threading mode, so
+/// concurrent use from multiple threads is safe. Remove that flag and this
+/// conformance becomes a lie.
+public final class Store: @unchecked Sendable {
     private let database: Database
 
     public init(fileURL: URL) throws {

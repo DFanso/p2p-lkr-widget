@@ -20,6 +20,11 @@
 - **Never name an app-target source file `main.swift`.** Swift treats that filename as top-level code and `@main` becomes a compile error: *"'main' attribute cannot be used in a module that contains top-level code."* Verified during design.
 - **Re-run `xcodegen generate` after adding, renaming, or deleting any source file.** The file list is baked into the `.xcodeproj`; a stale project fails with *"Build input file cannot be found."* Verified during design.
 - **`amountUSDT` is `Int` (whole USDT) everywhere.** It is a database key, and float equality in a `WHERE` clause is a bug waiting to happen.
+- **`Store` and `Database` must be `@unchecked Sendable`.** `Store` is passed
+  into the `Poller` actor, and Swift 6 strict concurrency rejects sending a
+  non-Sendable class across an actor boundary. The conformance is sound only
+  because the handle is opened `SQLITE_OPEN_FULLMUTEX` (serialized mode);
+  drop that flag and the conformance becomes a lie. Hit during Task 10.
 - **No emoji in UI copy.** Use SF Symbols for iconography.
 - **Tests never touch the network.** `URLProtocol` stubs serve the recorded fixtures.
 - **Swift Testing runs tests in parallel by default.** Any suite touching
