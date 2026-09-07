@@ -22,6 +22,10 @@
 - **`amountUSDT` is `Int` (whole USDT) everywhere.** It is a database key, and float equality in a `WHERE` clause is a bug waiting to happen.
 - **No emoji in UI copy.** Use SF Symbols for iconography.
 - **Tests never touch the network.** `URLProtocol` stubs serve the recorded fixtures.
+- **Swift Testing runs tests in parallel by default.** Any suite touching
+  process-global mutable state (the `URLProtocol` stub) MUST be declared
+  `@Suite(.serialized)`, or concurrent tests read each other's stubbed
+  responses. This bit Task 3 during execution.
 - **No AI attribution in commit messages.**
 
 ## Verified Ground Truth
@@ -790,6 +794,12 @@ final class StubURLProtocol: URLProtocol {
 
     override func stopLoading() {}
 
+    /// Sets the stub and clears any previously captured request.
+    static func install(status: Int = 200, body: Data = Data(), error: Error? = nil) {
+        stub = Stub(status: status, body: body, error: error)
+        lastRequestBody = nil
+    }
+
     static func session() -> URLSession {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubURLProtocol.self]
@@ -800,12 +810,16 @@ final class StubURLProtocol: URLProtocol {
 
 - [ ] **Step 2: Write the failing client tests**
 
-`P2PKit/Tests/P2PKitTests/BinanceP2PClientTests.swift`:
+`P2PKit/Tests/P2PKitTests/BinanceP2PClientTests.swift` — note the
+`@Suite(.serialized)` wrapper; without it these tests race over the global stub:
 
 ```swift
 import Testing
 import Foundation
 @testable import P2PKit
+
+@Suite(.serialized)
+struct BinanceP2PClientTests {
 
 @Test func requestBodyMapsUrlParametersOntoJsonFields() {
     let body = BinanceP2PClient.requestBody(side: .sell, fiat: "LKR",
