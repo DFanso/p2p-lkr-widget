@@ -32,10 +32,17 @@ nobody can trade.
 ## Install
 
 ```sh
-make sign-check                        # build signed, verify App Group
-cp -R "$(find ~/Library/Developer/Xcode/DerivedData -name P2PMonitor.app -path '*Debug*' | head -1)" /Applications/
-open /Applications/P2PMonitor.app
+make install
 ```
+
+That signs the build, verifies it, copies it with `ditto`, re-verifies the
+installed copy, and launches it. Use nothing else to install.
+
+`make build` is a compile check only — it passes `CODE_SIGNING_ALLOWED=NO`,
+which yields an ad-hoc bundle with **no entitlements**. macOS silently refuses
+to register an unsandboxed widget extension (`pkd: plug-ins must be sandboxed`),
+so the widget never appears in the gallery and nothing tells you why.
+`make verify` is the check that catches it.
 
 The app has no Dock or menu bar icon by design. It registers itself as a login
 item and collects a sample every five minutes while running. Re-launching it

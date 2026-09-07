@@ -110,6 +110,17 @@ widget is off-screen.
 └───────────────────────────────────────────────────────────┘
 ```
 
+**Approach B has one hard requirement that is easy to miss.** SwiftUI
+terminates an app when its last window closes, and this app is an
+`LSUIElement` agent with no windows by design. So `AppDelegate` must return
+`false` from `applicationShouldTerminateAfterLastWindowClosed`. Without it the
+process exits seconds after launch, never reaches the five-minute timer, and
+writes only the single immediate poll from `start()` — then launchd respawns
+it and the cycle repeats. The failure is genuinely deceptive: samples keep
+appearing in the store, so collection looks healthy, while every row comes
+from a different short-lived process and the cadence does not exist. Diagnose
+it by checking whether the PID in the log changes between polls.
+
 Signing uses the existing Developer ID Application certificate, team
 `UN798LFFKG`. Because the app is distributed outside the Mac App Store, the App
 Group identifier must carry the team prefix — `UN798LFFKG.group.dev.dfanso.p2pmonitor`,

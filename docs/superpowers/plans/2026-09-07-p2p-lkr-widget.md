@@ -40,6 +40,15 @@
   `caseDisplayRepresentations` be compile-time constants (`static let`), not
   computed properties. The widget therefore declares local `SideOption` /
   `WindowOption` mirrors and maps to P2PKit types. Confirmed in Task 13.
+- **`AppDelegate` MUST return `false` from
+  `applicationShouldTerminateAfterLastWindowClosed`.** SwiftUI otherwise
+  terminates this windowless `LSUIElement` agent seconds after launch; it then
+  never reaches the poll timer and only ever writes the one immediate poll,
+  while launchd respawns it on backoff. Rows keep appearing so collection
+  looks fine — the tell is a different PID on every poll. Found only by
+  running the installed app; no test catches it.
+- **`log show` hides `info`-level entries** unless `--info` is passed, and
+  `log` may be shadowed by a shell function — use `/usr/bin/log`.
 - **No emoji in UI copy.** Use SF Symbols for iconography.
 - **Tests never touch the network.** `URLProtocol` stubs serve the recorded fixtures.
 - **Swift Testing runs tests in parallel by default.** Any suite touching
@@ -4218,6 +4227,18 @@ sqlite3 "$DB" 'SELECT ts, side, amount_usdt, fillable_price, top_price, adv_name
 
 Expected: at least one row, with `fillable_price` at or below `top_price` — that
 inequality is the fillability filter doing its job.
+
+**A row is not sufficient evidence.** Confirm the collector is actually running
+on a cadence rather than being respawned once per poll:
+
+```bash
+/usr/bin/log show --predicate 'subsystem == "dev.dfanso.p2pmonitor"' --info --last 15m \
+  | grep 'poll stored'
+```
+
+Every line must carry the **same PID**, and consecutive timestamps must be
+about 300 seconds apart. Differing PIDs with short irregular gaps means the app
+is exiting after each poll and launchd is restarting it.
 
 Finally add the widget: right-click the desktop, choose Edit Widgets, search for
 "USDT/LKR Rate", and place the medium size. Confirm it shows a price rather than
