@@ -20,8 +20,41 @@
 - **Never name an app-target source file `main.swift`.** Swift treats that filename as top-level code and `@main` becomes a compile error: *"'main' attribute cannot be used in a module that contains top-level code."* Verified during design.
 - **Re-run `xcodegen generate` after adding, renaming, or deleting any source file.** The file list is baked into the `.xcodeproj`; a stale project fails with *"Build input file cannot be found."* Verified during design.
 - **`amountUSDT` is `Int` (whole USDT) everywhere.** It is a database key, and float equality in a `WHERE` clause is a bug waiting to happen.
+- **`Store` and `Database` must be `@unchecked Sendable`.** `Store` is passed
+  into the `Poller` actor, and Swift 6 strict concurrency rejects sending a
+  non-Sendable class across an actor boundary. The conformance is sound only
+  because the handle is opened `SQLITE_OPEN_FULLMUTEX` (serialized mode);
+  drop that flag and the conformance becomes a lie. Hit during Task 10.
+- **`SwiftUI.Settings` collides with `P2PKit.Settings`.** In any file importing
+  both, EVERY bare use of `Settings` is ambiguous — the scene must be written
+  `SwiftUI.Settings { ... }` and type annotations must be written
+  `P2PKit.Settings`. Hit twice, in Tasks 11 and 17.
+- **Do not use `@Published` outside an `ObservableObject`.** It needs Combine
+  and an `ObservableObject` conformance to mean anything; plain stored
+  properties (or `@Observable`) are correct for `CollectorService`.
+- **Annotate `AppDelegate` `@MainActor`.** It touches the `@MainActor`
+  `AppEnvironment`, which strict concurrency otherwise rejects.
+- **AppIntents cannot use enums from another module.** The metadata extractor
+  fails with "enums implemented in an imported framework or library are not
+  supported", and it also requires `typeDisplayRepresentation` and
+  `caseDisplayRepresentations` be compile-time constants (`static let`), not
+  computed properties. The widget therefore declares local `SideOption` /
+  `WindowOption` mirrors and maps to P2PKit types. Confirmed in Task 13.
+- **`AppDelegate` MUST return `false` from
+  `applicationShouldTerminateAfterLastWindowClosed`.** SwiftUI otherwise
+  terminates this windowless `LSUIElement` agent seconds after launch; it then
+  never reaches the poll timer and only ever writes the one immediate poll,
+  while launchd respawns it on backoff. Rows keep appearing so collection
+  looks fine — the tell is a different PID on every poll. Found only by
+  running the installed app; no test catches it.
+- **`log show` hides `info`-level entries** unless `--info` is passed, and
+  `log` may be shadowed by a shell function — use `/usr/bin/log`.
 - **No emoji in UI copy.** Use SF Symbols for iconography.
 - **Tests never touch the network.** `URLProtocol` stubs serve the recorded fixtures.
+- **Swift Testing runs tests in parallel by default.** Any suite touching
+  process-global mutable state (the `URLProtocol` stub) MUST be declared
+  `@Suite(.serialized)`, or concurrent tests read each other's stubbed
+  responses. This bit Task 3 during execution.
 - **No AI attribution in commit messages.**
 
 ## Verified Ground Truth
@@ -115,7 +148,17 @@ cp fixtures/lkr-sell-20260907.json fixtures/lkr-buy-20260907.json \
    P2PKit/Tests/P2PKitTests/Fixtures/
 ```
 
-- [ ] **Step 3: Write the failing test for AppGroup**
+- [ ] **Step 3: Create an empty source file so SPM can configure the target**
+
+SwiftPM refuses to resolve a package whose target directory has no sources
+(`target 'P2PKit' referenced in product 'P2PKit' is empty`), which would mask
+the intended test failure with a package error.
+
+```bash
+printf 'import Foundation\n' > P2PKit/Sources/P2PKit/AppGroup.swift
+```
+
+- [ ] **Step 4: Write the failing test for AppGroup**
 
 `P2PKit/Tests/P2PKitTests/AppGroupTests.swift`:
 
@@ -142,12 +185,12 @@ import Foundation
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it fails**
+- [ ] **Step 5: Run the test to verify it fails**
 
 Run: `cd P2PKit && swift test --filter AppGroup`
 Expected: FAIL — `cannot find 'AppGroup' in scope`.
 
-- [ ] **Step 5: Implement AppGroup**
+- [ ] **Step 6: Implement AppGroup**
 
 `P2PKit/Sources/P2PKit/AppGroup.swift`:
 
@@ -171,12 +214,12 @@ public enum AppGroup {
 }
 ```
 
-- [ ] **Step 6: Run the test to verify it passes**
+- [ ] **Step 7: Run the test to verify it passes**
 
 Run: `cd P2PKit && swift test --filter AppGroup`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 7: Write the entitlements files**
+- [ ] **Step 8: Write the entitlements files**
 
 `P2PMonitor/P2PMonitor.entitlements`:
 
@@ -205,7 +248,7 @@ would invite exactly the design mistake this architecture avoids.
 </dict></plist>
 ```
 
-- [ ] **Step 8: Write project.yml**
+- [ ] **Step 9: Write project.yml**
 
 ```yaml
 name: P2PMonitor
@@ -257,7 +300,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: P2PWidget/P2PWidget.entitlements
 ```
 
-- [ ] **Step 9: Write the two entry points**
+- [ ] **Step 10: Write the two entry points**
 
 `P2PMonitor/AppMain.swift` — **note the filename**, see Global Constraints:
 
@@ -306,7 +349,7 @@ struct P2PWidgetBundle: WidgetBundle {
 }
 ```
 
-- [ ] **Step 10: Write the Makefile**
+- [ ] **Step 11: Write the Makefile**
 
 ```makefile
 .PHONY: project build test sign-check clean
@@ -336,23 +379,23 @@ clean:
 	rm -rf P2PMonitor.xcodeproj P2PKit/.build
 ```
 
-- [ ] **Step 11: Add generated artifacts to .gitignore**
+- [ ] **Step 12: Add generated artifacts to .gitignore**
 
 ```bash
 printf '\n# XcodeGen output (regenerate with `make project`)\nP2PMonitor.xcodeproj/\n' >> .gitignore
 ```
 
-- [ ] **Step 12: Verify the unsigned build succeeds**
+- [ ] **Step 13: Verify the unsigned build succeeds**
 
 Run: `make build`
 Expected: `** BUILD SUCCEEDED **`
 
-- [ ] **Step 13: Verify signing and App Group propagation**
+- [ ] **Step 14: Verify signing and App Group propagation**
 
 Run: `make sign-check`
 Expected: `** BUILD SUCCEEDED **`, `P2PWidget.appex` listed under `Contents/PlugIns/`, and `UN798LFFKG.group.dev.dfanso.p2pmonitor` printed **twice** — once for the app, once for the widget. If it appears only once the widget cannot read the database.
 
-- [ ] **Step 14: Commit**
+- [ ] **Step 15: Commit**
 
 ```bash
 git add -A
@@ -780,6 +823,12 @@ final class StubURLProtocol: URLProtocol {
 
     override func stopLoading() {}
 
+    /// Sets the stub and clears any previously captured request.
+    static func install(status: Int = 200, body: Data = Data(), error: Error? = nil) {
+        stub = Stub(status: status, body: body, error: error)
+        lastRequestBody = nil
+    }
+
     static func session() -> URLSession {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubURLProtocol.self]
@@ -790,12 +839,16 @@ final class StubURLProtocol: URLProtocol {
 
 - [ ] **Step 2: Write the failing client tests**
 
-`P2PKit/Tests/P2PKitTests/BinanceP2PClientTests.swift`:
+`P2PKit/Tests/P2PKitTests/BinanceP2PClientTests.swift` — note the
+`@Suite(.serialized)` wrapper; without it these tests race over the global stub:
 
 ```swift
 import Testing
 import Foundation
 @testable import P2PKit
+
+@Suite(.serialized)
+struct BinanceP2PClientTests {
 
 @Test func requestBodyMapsUrlParametersOntoJsonFields() {
     let body = BinanceP2PClient.requestBody(side: .sell, fiat: "LKR",
@@ -2970,14 +3023,18 @@ struct RateConfigurationIntent: WidgetConfigurationIntent {
 }
 ```
 
-> **If the retroactive conformances fight you:** `AppEnum` conformance declared
-> outside the module that owns the type is the one genuinely uncertain
-> construct in this plan. Should the compiler reject it, do **not** move `Side`
-> or `ChartWindow` into the widget target. Instead declare widget-local mirrors
-> and map at the boundary — `enum SideOption: String, AppEnum { case sell, buy }`
-> with `var asSide: Side`, and likewise for the window. The intent then exposes
-> the mirrors and `RateTimelineProvider` converts them, leaving `P2PKit` free of
-> any AppIntents dependency.
+> **Confirmed during execution: the retroactive-conformance version above
+> does NOT compile.** `appintentsmetadataprocessor` rejects it with "enums
+> implemented in an imported framework or library are not supported", and
+> separately requires the display representations be `static let` constants
+> rather than computed properties. Use local mirrors instead — declare
+> `enum SideOption: String, AppEnum { case sell, buy }` and
+> `enum WindowOption: String, AppEnum { case hour1, hour24, day7, day30 }`
+> in the widget target with `var asSide: Side` / `var asWindow: ChartWindow`
+> accessors, expose those from the intent, and convert in
+> `RateTimelineProvider.entry(for:now:)`. This keeps P2PKit free of any
+> AppIntents dependency. See `P2PWidget/RateConfigurationIntent.swift` for
+> the shipped version.
 
 - [ ] **Step 3: Implement the timeline provider**
 
@@ -4170,6 +4227,18 @@ sqlite3 "$DB" 'SELECT ts, side, amount_usdt, fillable_price, top_price, adv_name
 
 Expected: at least one row, with `fillable_price` at or below `top_price` — that
 inequality is the fillability filter doing its job.
+
+**A row is not sufficient evidence.** Confirm the collector is actually running
+on a cadence rather than being respawned once per poll:
+
+```bash
+/usr/bin/log show --predicate 'subsystem == "dev.dfanso.p2pmonitor"' --info --last 15m \
+  | grep 'poll stored'
+```
+
+Every line must carry the **same PID**, and consecutive timestamps must be
+about 300 seconds apart. Differing PIDs with short irregular gaps means the app
+is exiting after each poll and launchd is restarting it.
 
 Finally add the widget: right-click the desktop, choose Edit Widgets, search for
 "USDT/LKR Rate", and place the medium size. Confirm it shows a price rather than

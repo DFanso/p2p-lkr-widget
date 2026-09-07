@@ -22,3 +22,6 @@ Package.resolved
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+
+# XcodeGen output (regenerate with `make project`)
+P2PMonitor.xcodeproj/
