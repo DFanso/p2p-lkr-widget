@@ -3,8 +3,9 @@
 A native macOS desktop widget that tracks the Binance P2P USDT/LKR rate, shows
 whether it is moving up or down, and charts history collected every 5 minutes.
 
-Status: **design approved, implementation not started.**
-See [the design spec](docs/superpowers/specs/2026-09-07-p2p-lkr-widget-design.md).
+Status: **working.** Collector and widget both shipped and verified running.
+See the [design spec](docs/superpowers/specs/2026-09-07-p2p-lkr-widget-design.md)
+and the [implementation plan](docs/superpowers/plans/2026-09-07-p2p-lkr-widget.md).
 
 ## Why
 
@@ -27,6 +28,31 @@ the top ad quoted 332.00 LKR but required a minimum order of 499,999 LKR
 (~1,500 USDT); the real tradeable rate for 500 USDT was 331.00. Filtering for
 fillability is the difference between a useful chart and one that spikes on ads
 nobody can trade.
+
+## Install
+
+```sh
+make sign-check                        # build signed, verify App Group
+cp -R "$(find ~/Library/Developer/Xcode/DerivedData -name P2PMonitor.app -path '*Debug*' | head -1)" /Applications/
+open /Applications/P2PMonitor.app
+```
+
+The app has no Dock or menu bar icon by design. It registers itself as a login
+item and collects a sample every five minutes while running. Re-launching it
+from Spotlight opens the detail window. To add the widget: right-click the
+desktop, choose Edit Widgets, search for "USDT/LKR Rate".
+
+Confirm collection is working:
+
+```sh
+sqlite3 "$HOME/Library/Group Containers/UN798LFFKG.group.dev.dfanso.p2pmonitor/p2p.sqlite" \
+  'SELECT ts, side, amount_usdt, fillable_price, top_price, adv_name
+   FROM samples ORDER BY ts DESC LIMIT 3;'
+```
+
+`fillable_price` should be at or below `top_price`. On the first verified run it
+read 330.70 against a top of book of 332.00 — a 1.30 LKR gap per unit that a
+naive reading of the page would have got wrong.
 
 ## Layout
 
