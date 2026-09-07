@@ -8,10 +8,13 @@ struct P2PMonitorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
-        // Replaced with the real detail window in Task 16.
         Window("USDT/LKR Rate", id: "detail") {
-            Text("Collecting…").frame(minWidth: 420, minHeight: 320)
+            DetailWindow(model: DetailViewModel(
+                store: AppEnvironment.shared.store,
+                settings: AppEnvironment.shared.settings,
+                collector: AppEnvironment.shared.collector))
         }
+        .defaultSize(width: 760, height: 600)
         // Qualified: SwiftUI.Settings collides with P2PKit.Settings.
         SwiftUI.Settings { Text("Preferences").padding() }
     }
