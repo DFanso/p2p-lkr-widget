@@ -19,30 +19,17 @@ let outputDir = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
     : "P2PMonitor/Assets.xcassets/AppIcon.appiconset"
 
-/// macOS draws icon artwork inside 824pt of a 1024pt canvas, leaving margin
-/// for the system's own shadow. Keeping that ratio makes the icon sit
-/// correctly next to Apple's own.
-let bodyRatio: CGFloat = 824.0 / 1024.0
-
-/// Superellipse exponent. 5 lands close to Apple's continuous-corner squircle;
-/// a plain rounded rect reads visibly wrong beside system icons.
-let squircleExponent: CGFloat = 5
-
-func squircle(in rect: CGRect, exponent n: CGFloat = squircleExponent) -> NSBezierPath {
-    let path = NSBezierPath()
-    let a = rect.width / 2, b = rect.height / 2
-    let cx = rect.midX, cy = rect.midY
-    let steps = 720
-    for i in 0...steps {
-        let t = CGFloat(i) / CGFloat(steps) * 2 * .pi
-        let ct = cos(t), st = sin(t)
-        let x = cx + a * pow(abs(ct), 2 / n) * (ct < 0 ? -1 : 1)
-        let y = cy + b * pow(abs(st), 2 / n) * (st < 0 ? -1 : 1)
-        if i == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.line(to: CGPoint(x: x, y: y)) }
-    }
-    path.close()
-    return path
-}
+// Artwork is FULL BLEED — no self-drawn rounded shape, no transparent margin.
+//
+// macOS 26 (Tahoe) composites a legacy .icns onto its own rounded container.
+// Supplying our own squircle plus margin nests our shape inside Apple's,
+// producing a small icon floating in a dark plate. Verified by asking
+// NSWorkspace for the resolved icon and looking at it. So we fill the canvas
+// and let the system apply the shape and shadow.
+//
+// Content still respects a safe area, because the system rounds the corners
+// and anything in them gets clipped.
+let safeAreaRatio: CGFloat = 0.80
 
 /// Normalised sparkline, x and y in 0...1 of the body rect. A clear net rise
 /// with enough wobble to read as real data rather than a generic arrow.
@@ -84,19 +71,21 @@ func render(pixels px: Int) -> Data {
     ctx.imageInterpolation = .high
 
     let canvas = CGFloat(px)
-    let bodySide = canvas * bodyRatio
+    let full = CGRect(x: 0, y: 0, width: canvas, height: canvas)
+
+    // Safe area the artwork is laid out within; the ground still bleeds to the
+    // edges behind it.
+    let bodySide = canvas * safeAreaRatio
     let body = CGRect(x: (canvas - bodySide) / 2, y: (canvas - bodySide) / 2,
                       width: bodySide, height: bodySide)
-    let shape = squircle(in: body)
 
-    // Emerald ground, light from above per the platform convention.
+    // Emerald ground, light from above per the platform convention, filling
+    // the whole canvas so the system's mask defines the silhouette.
     let gradient = NSGradient(colors: [
         NSColor(srgbRed: 0.063, green: 0.725, blue: 0.506, alpha: 1),  // #10B981
         NSColor(srgbRed: 0.024, green: 0.306, blue: 0.231, alpha: 1),  // #064E3B
     ])!
-    gradient.draw(in: shape, angle: -90)
-
-    shape.addClip()
+    gradient.draw(in: full, angle: -90)
 
     // The watermark and a thin stroke both disappear at 16-32px, so the small
     // renders drop the glyph and thicken the line instead.
