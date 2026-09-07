@@ -47,4 +47,40 @@ public enum MetricsEngine {
             advertiserMaxFiat: best?.maxFiat
         )
     }
+
+    /// Direction across the supplied window. The caller has already scoped the
+    /// series to the window, so this compares its ends.
+    public static func trend(series: [SeriesPoint]) -> Trend? {
+        guard let first = series.first, let last = series.last, series.count >= 2
+        else { return nil }
+        return Trend(previous: first.price, current: last.price)
+    }
+
+    /// Bucket-average a series. `bucketSeconds == 0` returns it unchanged.
+    ///
+    /// Empty buckets are omitted rather than filled: a gap must stay a gap so
+    /// the chart draws a break instead of implying a flat rate overnight.
+    public static func downsample(_ series: [SeriesPoint], bucketSeconds: Int) -> [SeriesPoint] {
+        guard bucketSeconds > 0 else { return series }
+        let bucket = TimeInterval(bucketSeconds)
+
+        var order: [TimeInterval] = []
+        var sums: [TimeInterval: (total: Double, count: Int)] = [:]
+
+        for point in series {
+            let key = (point.timestamp.timeIntervalSince1970 / bucket).rounded(.down) * bucket
+            if sums[key] == nil {
+                order.append(key)
+                sums[key] = (0, 0)
+            }
+            sums[key]!.total += point.price
+            sums[key]!.count += 1
+        }
+
+        return order.map { key in
+            let entry = sums[key]!
+            return SeriesPoint(timestamp: Date(timeIntervalSince1970: key),
+                               price: entry.total / Double(entry.count))
+        }
+    }
 }
