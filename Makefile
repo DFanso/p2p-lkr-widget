@@ -1,4 +1,4 @@
-.PHONY: project build test sign-check clean
+.PHONY: project build test sign-check icon clean
 
 project:
 	xcodegen generate
@@ -20,6 +20,9 @@ sign-check: project
 	 ls "$$APP/Contents/PlugIns/" ; \
 	 codesign -d --entitlements - --xml "$$APP" 2>/dev/null | plutil -convert xml1 -o - - | grep -A2 application-groups; \
 	 codesign -d --entitlements - --xml "$$APP/Contents/PlugIns/P2PWidget.appex" 2>/dev/null | plutil -convert xml1 -o - - | grep -A2 application-groups
+
+icon:
+	swift tools/make-icon.swift
 
 clean:
 	rm -rf P2PMonitor.xcodeproj P2PKit/.build
