@@ -28,6 +28,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationPresenter().requestAuthorization()
         AppEnvironment.shared.collector?.start()
         registerLoginItemIfWanted()
+
+        // The design calls for a hidden agent, but a SwiftUI `Window` scene
+        // opens at launch. Close it once the scene has been created; the app
+        // survives because applicationShouldTerminateAfterLastWindowClosed
+        // returns false, and applicationShouldHandleReopen brings it back.
+        DispatchQueue.main.async {
+            for window in NSApp.windows where window.isVisible {
+                window.close()
+            }
+        }
+    }
+
+    /// THE load-bearing method for this whole architecture. SwiftUI terminates
+    /// an app when its last window closes, and this is an LSUIElement agent
+    /// with no windows by design — so without this the process exits seconds
+    /// after launch, never reaches the five-minute timer, and only ever writes
+    /// the single immediate poll from `start()`. launchd then respawns it,
+    /// producing a stream of one-poll processes that looks like collection
+    /// working while the cadence is entirely broken.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 
     func applicationWillTerminate(_ notification: Notification) {
